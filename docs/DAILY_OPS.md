@@ -7,6 +7,6 @@ Weekly ingest, after the Sunday UEI match. The oneshot downloads Award Data Arch
 | `usaspending-awards-ingest.timer` | Sunday 18:00 UTC, 15m jitter, `Persistent=true` |
 | `usaspending-awards-ingest.service` | oneshot, user `usaspend` |
 
-Work sqlite: `/var/lib/usaspending-awards/usaspending-awards.sqlite`. Archive cache: `/var/lib/usaspending-awards/archive`. Logs: `journalctl -u usaspending-awards-ingest.service`.
+Work sqlite: `/var/lib/usaspending-awards/usaspending-awards.sqlite`. Archive cache: `/var/lib/usaspending-awards/archive`. The map at `/var/lib/uei-cik/uei-cik.sqlite` is read-only. `usaspend` is in group `ueicik` and that directory is `775`, so SQLite can create the WAL shm beside the map. Logs: `journalctl -u usaspending-awards-ingest.service`.
 
 A failed download records `status=error` and does not retract. `TimeoutStartSec=4h`.

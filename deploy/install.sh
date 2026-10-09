@@ -51,6 +51,13 @@ NLOGIN="/usr/sbin/nologin"
 if ! id -u "$USER_NAME" >/dev/null 2>&1; then
   useradd --system --home-dir "$STATE" --shell "$NLOGIN" "$USER_NAME" || true
 fi
+if getent group ueicik >/dev/null 2>&1; then
+  usermod -aG ueicik "$USER_NAME" || true
+  # A WAL reader creates a shm file next to the map. The sqlite file stays 644.
+  if [[ -d /var/lib/uei-cik ]]; then
+    chmod 0775 /var/lib/uei-cik || true
+  fi
+fi
 if getent group state-capture >/dev/null 2>&1; then
   usermod -aG state-capture "$USER_NAME" || true
   mkdir -p /var/lib/state-capture/announce
