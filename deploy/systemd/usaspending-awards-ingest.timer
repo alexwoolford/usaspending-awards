@@ -1,0 +1,12 @@
+[Unit]
+Description=USAspending prime awards for mapped UEIs
+Documentation=file:///opt/usaspending-awards/docs/DAILY_OPS.md
+
+[Timer]
+OnCalendar=Sun *-*-* 18:00:00 UTC
+Persistent=true
+RandomizedDelaySec=15m
+Unit=usaspending-awards-ingest.service
+
+[Install]
+WantedBy=timers.target

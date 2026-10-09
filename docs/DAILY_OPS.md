@@ -1,0 +1,12 @@
+# Daily ops
+
+Weekly ingest, after the Sunday UEI match. The oneshot downloads Award Data Archive Full files for FY2026 and FY2027 and keeps transactions whose `recipient_uei` is live in `/var/lib/uei-cik/uei-cik.sqlite`.
+
+| Unit | Schedule |
+| --- | --- |
+| `usaspending-awards-ingest.timer` | Sunday 18:00 UTC, 15m jitter, `Persistent=true` |
+| `usaspending-awards-ingest.service` | oneshot, user `usaspend` |
+
+Work sqlite: `/var/lib/usaspending-awards/usaspending-awards.sqlite`. Archive cache: `/var/lib/usaspending-awards/archive`. Logs: `journalctl -u usaspending-awards-ingest.service`.
+
+A failed download records `status=error` and does not retract. `TimeoutStartSec=4h`.

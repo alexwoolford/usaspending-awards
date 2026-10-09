@@ -1,0 +1,21 @@
+[Unit]
+Description=USAspending prime awards for mapped UEIs
+Documentation=file:///opt/usaspending-awards/docs/DAILY_OPS.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=usaspend
+Group=usaspend
+Nice=10
+EnvironmentFile=-/opt/usaspending-awards/etc/usaspending-awards.env
+WorkingDirectory=/opt/usaspending-awards
+ExecStart=/opt/usaspending-awards/scripts/run-ingest.sh
+TimeoutStartSec=4h
+SyslogIdentifier=usaspending-awards-ingest
+ReadWritePaths=/var/lib/usaspending-awards /var/lib/state-capture -/run/state
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+NoNewPrivileges=true
