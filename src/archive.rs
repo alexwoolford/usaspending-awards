@@ -1,4 +1,5 @@
-//! Award Data Archive Full files for FY2026 and FY2027. Delta files are not read.
+//! Award Data Archive Full files for the current fiscal year and the one before it.
+//! Delta files are not read.
 
 use std::fs::{self, File};
 use std::io::{copy, Write};
@@ -23,12 +24,14 @@ pub struct ListedFile {
     pub fiscal_year: Option<i64>,
 }
 
-pub fn select_full(files: &[ListedFile]) -> Vec<ListedFile> {
+pub fn select_full(files: &[ListedFile], prior_fy: i32, current_fy: i32) -> Vec<ListedFile> {
+    let prior = format!("FY{prior_fy}_");
+    let current = format!("FY{current_fy}_");
     let mut out: Vec<ListedFile> = files
         .iter()
         .filter(|file| {
             file.file_name.contains("_Full_")
-                && (file.file_name.starts_with("FY2026_") || file.file_name.starts_with("FY2027_"))
+                && (file.file_name.starts_with(&prior) || file.file_name.starts_with(&current))
         })
         .cloned()
         .collect();
@@ -37,10 +40,14 @@ pub fn select_full(files: &[ListedFile]) -> Vec<ListedFile> {
     out
 }
 
-pub fn download_full_files(cache_dir: &Path) -> Result<Vec<ArchiveFile>> {
-    tracing::info!("listing award archive");
-    let listed = list_archive()?;
-    let selected = select_full(&listed);
+pub fn download_full_files(
+    cache_dir: &Path,
+    prior_fy: i32,
+    current_fy: i32,
+) -> Result<Vec<ArchiveFile>> {
+    tracing::info!(prior_fy, current_fy, "listing award archive");
+    let listed = list_archive(prior_fy, current_fy)?;
+    let selected = select_full(&listed, prior_fy, current_fy);
     fs::create_dir_all(cache_dir).with_context(|| format!("create {}", cache_dir.display()))?;
     let mut out = Vec::new();
     for file in selected {
@@ -55,33 +62,30 @@ pub fn download_full_files(cache_dir: &Path) -> Result<Vec<ArchiveFile>> {
     Ok(out)
 }
 
-fn list_archive() -> Result<Vec<ListedFile>> {
+fn list_archive(prior_fy: i32, current_fy: i32) -> Result<Vec<ListedFile>> {
     let client = reqwest::blocking::Client::builder()
         .timeout(std::time::Duration::from_secs(120))
         .build()
         .context("http client")?;
     let mut files = Vec::new();
-    for (fiscal_year, kind) in [
-        (2026, "contracts"),
-        (2026, "assistance"),
-        (2027, "contracts"),
-        (2027, "assistance"),
-    ] {
-        let body = serde_json::json!({
-            "agency": "all",
-            "fiscal_year": fiscal_year,
-            "type": kind
-        });
-        let text = client
-            .post(LIST_URL)
-            .json(&body)
-            .send()
-            .context("list monthly files")?
-            .error_for_status()
-            .context("list monthly files status")?
-            .text()
-            .context("list monthly files body")?;
-        files.extend(parse_list(&text)?);
+    for fiscal_year in [prior_fy, current_fy] {
+        for kind in ["contracts", "assistance"] {
+            let body = serde_json::json!({
+                "agency": "all",
+                "fiscal_year": fiscal_year,
+                "type": kind
+            });
+            let text = client
+                .post(LIST_URL)
+                .json(&body)
+                .send()
+                .context("list monthly files")?
+                .error_for_status()
+                .context("list monthly files status")?
+                .text()
+                .context("list monthly files body")?;
+            files.extend(parse_list(&text)?);
+        }
     }
     Ok(files)
 }
@@ -224,7 +228,7 @@ mod tests {
                 fiscal_year: Some(2027),
             },
         ];
-        let selected = select_full(&files);
+        let selected = select_full(&files, 2026, 2027);
         assert_eq!(
             selected
                 .iter()
@@ -233,6 +237,43 @@ mod tests {
             vec![
                 "FY2026_All_Contracts_Full_20260906.zip",
                 "FY2027_All_Assistance_Full_20261008.zip"
+            ]
+        );
+    }
+
+    #[test]
+    fn a_later_october_drops_the_year_that_fell_behind() {
+        let files = vec![
+            ListedFile {
+                file_name: "FY2026_All_Contracts_Full_20260906.zip".into(),
+                url: "https://example.invalid/old".into(),
+                fiscal_year: Some(2026),
+            },
+            ListedFile {
+                file_name: "FY2027_All_Contracts_Full_20271001.zip".into(),
+                url: "https://example.invalid/c".into(),
+                fiscal_year: Some(2027),
+            },
+            ListedFile {
+                file_name: "FY2028_All_Assistance_Full_20271001.zip".into(),
+                url: "https://example.invalid/a".into(),
+                fiscal_year: Some(2028),
+            },
+            ListedFile {
+                file_name: "FY(All)_All_Contracts_Delta_20271001.zip".into(),
+                url: "https://example.invalid/d".into(),
+                fiscal_year: None,
+            },
+        ];
+        let selected = select_full(&files, 2027, 2028);
+        assert_eq!(
+            selected
+                .iter()
+                .map(|f| f.file_name.as_str())
+                .collect::<Vec<_>>(),
+            vec![
+                "FY2027_All_Contracts_Full_20271001.zip",
+                "FY2028_All_Assistance_Full_20271001.zip"
             ]
         );
     }

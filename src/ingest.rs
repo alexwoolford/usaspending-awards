@@ -12,6 +12,7 @@ use zip::ZipArchive;
 use crate::archive::{download_full_files, ArchiveFile};
 use crate::db::{clear_stage, promote_stage, retract_absent, stage_row, upsert_run};
 use crate::parse::scan_csv;
+use crate::time::award_window;
 
 pub struct IngestStats {
     pub status: &'static str,
@@ -27,15 +28,27 @@ pub fn ingest_archives(
     cache_dir: &Path,
     window_end: &str,
 ) -> Result<(i64, i64)> {
-    let files = download_full_files(cache_dir)?;
+    let window = award_window(window_end)?;
+    tracing::info!(
+        prior_fy = window.prior_fy,
+        current_fy = window.current_fy,
+        start = %window.start,
+        end = window_end,
+        "award window"
+    );
+    let files = download_full_files(cache_dir, window.prior_fy, window.current_fy)?;
     if files.is_empty() {
-        bail!("award archive listed no FY2026 or FY2027 Full file");
+        bail!(
+            "award archive listed no FY{} or FY{} Full file",
+            window.prior_fy,
+            window.current_fy
+        );
     }
     clear_stage(conn)?;
     let mut scanned = 0i64;
     for file in &files {
         tracing::info!(file = %file.file_name, "reading archive");
-        scanned += scan_zip(conn, ueis, file, window_end)?;
+        scanned += scan_zip(conn, ueis, file, &window.start, window_end)?;
     }
     let kept: i64 = conn.query_row("SELECT COUNT(*) FROM transaction_stage", [], |row| {
         row.get(0)
@@ -51,6 +64,7 @@ fn scan_zip(
     conn: &Connection,
     ueis: &HashSet<String>,
     file: &ArchiveFile,
+    window_start: &str,
     window_end: &str,
 ) -> Result<i64> {
     let handle = File::open(&file.path).with_context(|| format!("open {}", file.path.display()))?;
@@ -68,7 +82,9 @@ fn scan_zip(
         saw_csv = true;
         let name = member.name().to_string();
         tracing::info!(csv = %name, "scanning");
-        let stats = scan_csv(member, ueis, window_end, |row| stage_row(&tx, &row))?;
+        let stats = scan_csv(member, ueis, window_start, window_end, |row| {
+            stage_row(&tx, &row)
+        })?;
         tracing::info!(csv = %name, scanned = stats.scanned, kept = stats.kept, "scanned");
         scanned += stats.scanned as i64;
     }

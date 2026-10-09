@@ -1,6 +1,6 @@
 # usaspending-awards
 
-Prime-award transactions whose recipient UEI is already on the exact CIK map. Contracts, and grants including cooperative agreements, for FY2026 and FY2027 through the day the job runs.
+Prime-award transactions whose recipient UEI is already on the exact CIK map. Contracts, and grants including cooperative agreements, for the current federal fiscal year and the one before it. The pair is taken from the UTC day the job runs. A year that falls behind is retracted on the next successful run.
 
 The UEI-to-CIK decision stays in [uei-cik](https://github.com/alexwoolford/uei-cik). This tile does not read `recipient_parent_uei`.
 

@@ -7,8 +7,6 @@ use std::io::Read;
 use anyhow::{bail, Context, Result};
 use csv::StringRecord;
 
-use crate::time::WINDOW_START;
-
 pub const KIND_CONTRACT: &str = "contract";
 pub const KIND_GRANT: &str = "grant";
 
@@ -51,6 +49,7 @@ struct Cols {
 pub fn scan_csv<R: Read>(
     reader: R,
     ueis: &HashSet<String>,
+    window_start: &str,
     window_end: &str,
     mut on_row: impl FnMut(AwardRow) -> Result<()>,
 ) -> Result<ScanStats> {
@@ -64,7 +63,7 @@ pub fn scan_csv<R: Read>(
     let mut record = StringRecord::new();
     while rdr.read_record(&mut record).context("csv record")? {
         stats.scanned += 1;
-        if let Some(row) = keep_record(&cols, &record, ueis, window_end) {
+        if let Some(row) = keep_record(&cols, &record, ueis, window_start, window_end) {
             on_row(row)?;
             stats.kept += 1;
         }
@@ -121,6 +120,7 @@ fn keep_record(
     cols: &Cols,
     record: &StringRecord,
     ueis: &HashSet<String>,
+    window_start: &str,
     window_end: &str,
 ) -> Option<AwardRow> {
     let uei = field(record, cols.uei).to_ascii_uppercase();
@@ -137,7 +137,7 @@ fn keep_record(
         }
     }
     let action_date = action_date(field(record, cols.action_date))?;
-    if action_date.as_str() < WINDOW_START || action_date.as_str() > window_end {
+    if action_date.as_str() < window_start || action_date.as_str() > window_end {
         return None;
     }
     let obligation = obligation(field(record, cols.obligation))?;
@@ -251,7 +251,7 @@ mod tests {
 
     fn scan(csv: &str) -> Vec<AwardRow> {
         let mut rows = Vec::new();
-        scan_csv(csv.as_bytes(), &ueis(), "2026-10-08", |row| {
+        scan_csv(csv.as_bytes(), &ueis(), "2025-10-01", "2026-10-08", |row| {
             rows.push(row);
             Ok(())
         })

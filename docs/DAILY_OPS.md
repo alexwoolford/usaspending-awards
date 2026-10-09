@@ -1,6 +1,6 @@
 # Daily ops
 
-Weekly ingest, after the Sunday UEI match. The oneshot downloads Award Data Archive Full files for FY2026 and FY2027 and keeps transactions whose `recipient_uei` is live in `/var/lib/uei-cik/uei-cik.sqlite`.
+Weekly ingest, after the Sunday UEI match. The oneshot downloads Award Data Archive Full files for the current federal fiscal year and the one before it, taken from the UTC day of the run, and keeps transactions whose `recipient_uei` is live in `/var/lib/uei-cik/uei-cik.sqlite`. A successful run retracts the year that fell behind.
 
 | Unit | Schedule |
 | --- | --- |
